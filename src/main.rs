@@ -18,7 +18,7 @@ async fn main() {
     let exchanges = init_exchanges();
 
     /// Henry: This works as you have multiple readers and writers accessin this state across various tasks.
-    /// I would prefer not to communcate the state and changes via channel instead.
+    /// I would prefer to share the state and changes via channel instead.
     /// 
     /// Use oneshot channel with response for reads in init_state_handler
     /// All writes will need to send `markets_state` mpsc channel.
