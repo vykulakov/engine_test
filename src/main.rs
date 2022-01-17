@@ -16,6 +16,13 @@ mod ftx;
 async fn main() {
     println!("start!");
     let exchanges = init_exchanges();
+
+    /// Henry: This works as you have multiple readers and writers accessin this state across various tasks.
+    /// I would prefer not to communcate the state and changes via channel instead.
+    /// 
+    /// Use oneshot channel with response for reads in init_state_handler
+    /// All writes will need to send `markets_state` mpsc channel.
+    /// Can discuss further.
     let markets_state: Arc<std::sync::RwLock<HashMap<String, Vec<Market>>>> = Arc::new(RwLock::new(HashMap::new()));
 
     init_state_handler(markets_state.clone()).await;
@@ -75,6 +82,7 @@ fn init_exchanges() -> Vec<Box<dyn Exchange + Send>> {
 
     let mut exchanges = Vec::new();
 
+    /// Henry: Use enum
     // Available exchanges
     // All the exchanges should have if in the loop below!
     let list = ["ftx", "ftx-test"];

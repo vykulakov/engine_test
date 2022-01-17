@@ -53,6 +53,21 @@ impl Exchange for Ftx {
         let url = format!("{}{}", BASE_URL, MARKETS_PATH);
 
         let res = self.client.get(url).send().await.expect("Fail to make markets request");
+
+        /// Henry:
+        /// The idiomatic Rust code would've been
+        /// 
+        /// ```rust
+        /// res.json::<MarketsResponse>()
+        ///    .await
+        ///    .map_err(|err| fmt!("Fail to parse body of markets request"))?
+        ///    .and_then(|mkt_response| {
+        ///      if mkt_response.success {
+        ///         return Ok(mkt_response.result.unwrap());
+        ///      }
+        ///      Err(format!("Bad markets response: {}", ....)) 
+        ///   })
+        /// ```
         let resp = res.json::<MarketsResponse>().await.expect("Fail to parse body of markets request");
 
         return if resp.success {
@@ -63,9 +78,12 @@ impl Exchange for Ftx {
     }
 
     async fn subscribe_to_books(&self) -> Result<(), String> {
+
         let id = self.get_id();
 
         let url = Url::parse(WS_URL).unwrap();
+        /// Henry: I'm not a fan of panicking too much.
+        /// Could have converted it into a custom error which you could've retried it again.
         let (stream, _) = connect_async(url).await.expect("Cannot connect to FTX WS");
 
         let (mut write, mut read) = stream.split();
@@ -87,6 +105,22 @@ impl Exchange for Ftx {
             panic!("{}: bad message type: {:?}", id.clone(), msg)
         }
 
+        /// Henry: Feels like unnecessary complexity was addd due to combining ping and web socket stream
+        /// 
+        /// Would have:
+        /// ```rust
+        /// 
+        /// tokio::spawn(async move {
+        ///  // handle web socket ping at regular interval
+        /// });
+        /// 
+        /// tokio::spawn(async move {
+        ///   // Read ws stream.
+        /// })
+        /// ```
+        /// 
+        /// Also would consider restarting ws connection if it gets closed prematurely on Msg:Close frame.
+        /// Need to reconsider how this should be refactored.
         task::spawn(async move {
             println!("{}: starting orderbook loop", &id);
 
@@ -104,6 +138,7 @@ impl Exchange for Ftx {
                             let msg = m.unwrap().unwrap();
                             cnt += 1;
                         }
+                        
                         _ = ping_interval.tick() => {
                             println!("send ping, count = {}, last update = {:?}", cnt, upd);
                             write.send(png.clone()).await.expect("Cannot send ping message");
